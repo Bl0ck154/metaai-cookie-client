@@ -1,7 +1,7 @@
 {
   "name": "metaai-cookie-client",
   "version": "0.1.0",
-  "description": "Unofficial cookie-based browser client for Meta AI web video generation",
+  "description": "Unofficial cookie-based browser client for Meta AI web",
   "type": "module",
   "main": "src/index.js",
   "repository": {
@@ -35,7 +35,8 @@
     "metaai",
     "cookie-client",
     "playwright",
-    "video-generation",
+    "browser-client",
+    "meta-ai",
     "unofficial"
   ],
   "license": "MIT"

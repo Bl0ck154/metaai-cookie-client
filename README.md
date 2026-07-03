@@ -1,35 +1,41 @@
 # metaai-cookie-client
 
-Small unofficial cookie-based client for Meta AI web video generation.
+Unofficial cookie-based browser client for Meta AI web.
 
-It drives the Meta AI website with Playwright. It is not an official Meta product, not affiliated with Meta, and can break any time if the website changes.
+It uses your existing Meta AI web session cookies and drives the website with Playwright. It is not affiliated with Meta and can break when the website changes.
+
+## What is implemented now
+
+- Cookie header parsing.
+- Meta AI session check.
+- Access token and viewer id extraction from the web app.
+- Gateway URL discovery helpers.
+- Browser-based prompt submit flow.
+- Image-to-video generation through the web UI.
+
+More Meta AI web actions can be added on top of the same cookie/session layer.
 
 ## Install
 
 ```bash
 npm install
 npm install playwright
-```
-
-If Playwright asks for a browser:
-
-```bash
 npx playwright install chromium
 ```
 
 ## Cookies
 
-Pass cookies as one normal cookie header string:
+Use a normal cookie header string:
 
 ```text
 ecto_1_sess=...; rd_challenge=...
 ```
 
-Do not add `Cookie:` at the beginning.
+No `Cookie:` prefix. No JSON.
 
 Do not commit real cookies.
 
-## Quick Test
+## Quick test
 
 Create `.env`:
 
@@ -41,30 +47,30 @@ META_AI_HEADLESS=false
 Run:
 
 ```bash
-npm run example:animate -- ./image.png "Animate this image into a short cute video."
+npm run example:animate -- ./image.png "Animate this image."
 ```
 
-The example writes `output.mp4` in this folder.
+It writes `output.mp4`.
 
-## Use In Code
+## Usage
 
 ```js
 import { generateMetaAiVideo } from './src/index.js';
 
 const result = await generateMetaAiVideo({
   cookieHeader: process.env.META_AI_COOKIE_HEADER,
-  prompt: 'Animate this image into a short cute video.',
+  prompt: 'Animate this image.',
   referenceImage: {
     base64: '<image base64>',
     mimeType: 'image/png',
   },
 });
 
+console.log(result.videoUrl);
 console.log(result.mimeType);
-console.log(result.base64.length);
 ```
 
-## Status Check
+## Check session
 
 ```js
 import { getSafeMetaAiStatus } from './src/index.js';
@@ -73,21 +79,20 @@ const status = await getSafeMetaAiStatus({
   cookieHeader: process.env.META_AI_COOKIE_HEADER,
 });
 
-console.log(status.configured);
+console.log(status);
 ```
 
-## Options
+## Environment
 
 - `META_AI_COOKIE_HEADER` - cookie header string.
-- `META_AI_HEADLESS=false` - show browser while testing.
+- `META_AI_HEADLESS=false` - show the browser.
 - `META_AI_CHROME_CHANNEL=chrome` - use installed Chrome.
-- `META_AI_CHROME_EXECUTABLE_PATH=/path/to/chrome` - use a specific browser binary.
+- `META_AI_CHROME_EXECUTABLE_PATH=/path/to/chrome` - use a specific browser.
 - `META_AI_TIMEOUT_MS=180000` - generation timeout.
 
 ## Notes
 
-- This is brittle by design.
-- It drives the website with Playwright.
+- This is a browser client, not an official API.
+- It needs Playwright and a Chromium-compatible browser.
 - Direct private WebSocket replay is not implemented.
-- Real cookies are account secrets.
-- Use at your own risk.
+- Cookies are account secrets.
