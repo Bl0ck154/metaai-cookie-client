@@ -1,0 +1,42 @@
+{
+  "name": "metaai-cookie-client",
+  "version": "0.1.0",
+  "description": "Unofficial cookie-based browser client for Meta AI web video generation",
+  "type": "module",
+  "main": "src/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bl0ck154/metaai-cookie-client.git"
+  },
+  "homepage": "https://github.com/Bl0ck154/metaai-cookie-client#readme",
+  "bugs": {
+    "url": "https://github.com/Bl0ck154/metaai-cookie-client/issues"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./browser-flow": "./src/browser-flow.js"
+  },
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/browser-flow.js && node --check examples/animate-image.js",
+    "example:animate": "node --env-file=.env examples/animate-image.js"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.40.0"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "metaai",
+    "cookie-client",
+    "playwright",
+    "video-generation",
+    "unofficial"
+  ],
+  "license": "MIT"
+}
