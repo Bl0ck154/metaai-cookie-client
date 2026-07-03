@@ -14,6 +14,9 @@ import {
 const DEFAULT_TIMEOUT_MS = 180_000;
 const DEFAULT_VIEWPORT = { width: 1280, height: 900 };
 
+let sharedBrowserPromise = null;
+let sharedBrowserKey = '';
+
 function metaAiBrowserError(message, { status = 500, code = 'META_AI_BROWSER_ERROR' } = {}) {
   const err = new Error(message);
   err.status = status;
@@ -150,6 +153,49 @@ async function downloadVideo(videoUrl, { fetchImpl = globalThis.fetch, signal } 
   };
 }
 
+function browserLaunchKey(launchOptions) {
+  return JSON.stringify({
+    headless: launchOptions.headless,
+    executablePath: launchOptions.executablePath || '',
+    channel: launchOptions.channel || '',
+  });
+}
+
+async function getBrowser(pw, launchOptions, { reuseBrowser = true } = {}) {
+  if (!reuseBrowser) {
+    return { browser: await pw.chromium.launch(launchOptions), closeAfterUse: true };
+  }
+
+  const key = browserLaunchKey(launchOptions);
+  if (sharedBrowserPromise && sharedBrowserKey !== key) {
+    const oldBrowser = await sharedBrowserPromise.catch(() => null);
+    await oldBrowser?.close?.().catch(() => {});
+    sharedBrowserPromise = null;
+  }
+
+  if (!sharedBrowserPromise) {
+    sharedBrowserKey = key;
+    sharedBrowserPromise = pw.chromium.launch(launchOptions).catch(err => {
+      sharedBrowserPromise = null;
+      throw err;
+    });
+  }
+
+  const browser = await sharedBrowserPromise;
+  if (browser.isConnected && !browser.isConnected()) {
+    sharedBrowserPromise = null;
+    return getBrowser(pw, launchOptions, { reuseBrowser });
+  }
+  return { browser, closeAfterUse: false };
+}
+
+export async function closeMetaAiBrowser() {
+  const browser = await sharedBrowserPromise.catch(() => null);
+  sharedBrowserPromise = null;
+  sharedBrowserKey = '';
+  await browser?.close?.().catch(() => {});
+}
+
 async function clickFirstVisible(locatorCandidates, { timeoutMs = 15_000 } = {}) {
   let lastError = null;
   for (const locator of locatorCandidates) {
@@ -281,6 +327,7 @@ export async function generateMetaAiVideoViaBrowser({
   playwright,
   executablePath = process.env.META_AI_CHROME_EXECUTABLE_PATH || '',
   channel = process.env.META_AI_CHROME_CHANNEL || '',
+  reuseBrowser = process.env.META_AI_REUSE_BROWSER !== 'false',
 } = {}) {
   const cookies = buildCookieHeader(cookieHeader);
   if (!cookies) {
@@ -303,10 +350,14 @@ export async function generateMetaAiVideoViaBrowser({
   else if (channel) launchOptions.channel = channel;
 
   let browser;
+  let context;
+  let closeBrowserAfterUse = true;
   const observedResults = [];
   try {
-    browser = await pw.chromium.launch(launchOptions);
-    const context = await browser.newContext({
+    const browserHandle = await getBrowser(pw, launchOptions, { reuseBrowser });
+    browser = browserHandle.browser;
+    closeBrowserAfterUse = browserHandle.closeAfterUse;
+    context = await browser.newContext({
       viewport: DEFAULT_VIEWPORT,
       userAgent: DEFAULT_USER_AGENT,
       locale: 'ru-RU',
@@ -378,7 +429,8 @@ export async function generateMetaAiVideoViaBrowser({
       ...downloaded,
     };
   } finally {
-    if (browser) await browser.close().catch(() => {});
+    if (context) await context.close().catch(() => {});
+    if (browser && closeBrowserAfterUse) await browser.close().catch(() => {});
     if (imageFile?.cleanup) await fs.unlink(imageFile.filePath).catch(() => {});
   }
 }

@@ -286,3 +286,8 @@ export async function generateMetaAiVideo(options = {}) {
   const { generateMetaAiVideoViaBrowser } = await import('./browser-flow.js');
   return generateMetaAiVideoViaBrowser(options);
 }
+
+export async function closeMetaAiBrowser() {
+  const { closeMetaAiBrowser: closeBrowser } = await import('./browser-flow.js');
+  return closeBrowser();
+}

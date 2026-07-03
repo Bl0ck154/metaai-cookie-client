@@ -86,6 +86,7 @@ console.log(status);
 
 - `META_AI_COOKIE_HEADER` - cookie header string.
 - `META_AI_HEADLESS=false` - show the browser.
+- `META_AI_REUSE_BROWSER=false` - launch a fresh browser for every call.
 - `META_AI_CHROME_CHANNEL=chrome` - use installed Chrome.
 - `META_AI_CHROME_EXECUTABLE_PATH=/path/to/chrome` - use a specific browser.
 - `META_AI_TIMEOUT_MS=180000` - generation timeout.
@@ -94,5 +95,6 @@ console.log(status);
 
 - This is a browser client, not an official API.
 - It needs Playwright and a Chromium-compatible browser.
+- By default it reuses one browser process and creates a fresh context per call.
 - Direct private WebSocket replay is not implemented.
 - Cookies are account secrets.
