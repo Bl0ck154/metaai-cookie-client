@@ -9,6 +9,7 @@ import {
   buildCookieHeader,
   extractMetaAiVideoResultFromText,
   parseCookieHeader,
+  safeCookieSummary,
 } from './index.js';
 
 const DEFAULT_TIMEOUT_MS = 180_000;
@@ -194,6 +195,88 @@ export async function closeMetaAiBrowser() {
   sharedBrowserPromise = null;
   sharedBrowserKey = '';
   await browser?.close?.().catch(() => {});
+}
+
+export async function getMetaAiBrowserStatus({
+  cookieHeader,
+  headless = process.env.META_AI_HEADLESS !== 'false',
+  playwright,
+  executablePath = process.env.META_AI_CHROME_EXECUTABLE_PATH || '',
+  channel = process.env.META_AI_CHROME_CHANNEL || '',
+  reuseBrowser = process.env.META_AI_REUSE_BROWSER !== 'false',
+} = {}) {
+  const cookies = buildCookieHeader(cookieHeader);
+  if (!cookies) {
+    throw metaAiBrowserError('Meta AI cookies are not configured', {
+      status: 503,
+      code: 'META_AI_COOKIES_MISSING',
+    });
+  }
+
+  const pw = playwright || await import('playwright');
+  const launchOptions = {
+    headless: Boolean(headless),
+    args: ['--disable-dev-shm-usage'],
+  };
+  if (executablePath) launchOptions.executablePath = executablePath;
+  else if (channel) launchOptions.channel = channel;
+
+  let browser;
+  let context;
+  let closeBrowserAfterUse = true;
+  try {
+    const browserHandle = await getBrowser(pw, launchOptions, { reuseBrowser });
+    browser = browserHandle.browser;
+    closeBrowserAfterUse = browserHandle.closeAfterUse;
+    context = await browser.newContext({
+      viewport: DEFAULT_VIEWPORT,
+      userAgent: DEFAULT_USER_AGENT,
+      locale: 'ru-RU',
+    });
+    await context.addCookies(cookieHeaderToPlaywrightCookies(cookies));
+    const page = await context.newPage();
+    let response;
+    try {
+      response = await page.goto(META_AI_HOME, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+    } catch (err) {
+      throw wrapStageError(err, 'browser_status_open_meta_ai');
+    }
+
+    const status = response?.status?.() || 0;
+    const sourceUrl = page.url();
+    if (/login/i.test(sourceUrl)) {
+      throw metaAiBrowserError('Meta AI cookies appear to be expired or unauthenticated', {
+        status: 401,
+        code: 'META_AI_AUTH_EXPIRED',
+      });
+    }
+    if (status >= 400) {
+      throw metaAiBrowserError(`Meta AI browser status returned HTTP ${status}`, {
+        status,
+        code: 'META_AI_BROWSER_STATUS_HTTP',
+      });
+    }
+
+    return {
+      configured: true,
+      mode: 'browser',
+      sourceUrl,
+      sourceStatus: status,
+      title: await page.title().catch(() => ''),
+      cookieSummary: safeCookieSummary(cookies),
+      accessToken: {
+        present: false,
+        note: 'Browser status loaded Meta AI without extracting a homepage access token.',
+      },
+      browser: {
+        reused: !closeBrowserAfterUse,
+        headless: Boolean(headless),
+      },
+    };
+  } finally {
+    if (context) await context.close().catch(() => {});
+    if (browser && closeBrowserAfterUse) await browser.close().catch(() => {});
+  }
 }
 
 async function clickFirstVisible(locatorCandidates, { timeoutMs = 15_000 } = {}) {
