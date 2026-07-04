@@ -84,12 +84,14 @@ console.log(status);
 
 ## Environment
 
-- `META_AI_COOKIE_HEADER` - cookie header string.
+- `META_AI_COOKIE_HEADER` - full cookie header string from `meta.ai`.
 - `META_AI_HEADLESS=false` - show the browser.
 - `META_AI_REUSE_BROWSER=false` - launch a fresh browser for every call.
 - `META_AI_CHROME_CHANNEL=chrome` - use installed Chrome.
 - `META_AI_CHROME_EXECUTABLE_PATH=/path/to/chrome` - use a specific browser.
 - `META_AI_TIMEOUT_MS=180000` - generation timeout.
+- `META_AI_PROXY_SERVER=http://host:port` - optional browser proxy.
+- `META_AI_PROXY_USERNAME` / `META_AI_PROXY_PASSWORD` - optional proxy auth.
 
 ## Notes
 

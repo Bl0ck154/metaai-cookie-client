@@ -159,7 +159,32 @@ function browserLaunchKey(launchOptions) {
     headless: launchOptions.headless,
     executablePath: launchOptions.executablePath || '',
     channel: launchOptions.channel || '',
+    proxyServer: launchOptions.proxy?.server || '',
+    proxyUsername: launchOptions.proxy?.username ? 'set' : '',
   });
+}
+
+function proxyOptionsFromEnv() {
+  const server = String(process.env.META_AI_PROXY_SERVER || '').trim();
+  if (!server) return null;
+  const proxy = { server };
+  const username = String(process.env.META_AI_PROXY_USERNAME || '').trim();
+  const password = String(process.env.META_AI_PROXY_PASSWORD || '').trim();
+  if (username) proxy.username = username;
+  if (password) proxy.password = password;
+  return proxy;
+}
+
+function buildLaunchOptions({ headless, executablePath, channel }) {
+  const launchOptions = {
+    headless: Boolean(headless),
+    args: ['--disable-dev-shm-usage'],
+  };
+  if (executablePath) launchOptions.executablePath = executablePath;
+  else if (channel) launchOptions.channel = channel;
+  const proxy = proxyOptionsFromEnv();
+  if (proxy) launchOptions.proxy = proxy;
+  return launchOptions;
 }
 
 async function getBrowser(pw, launchOptions, { reuseBrowser = true } = {}) {
@@ -214,12 +239,7 @@ export async function getMetaAiBrowserStatus({
   }
 
   const pw = playwright || await import('playwright');
-  const launchOptions = {
-    headless: Boolean(headless),
-    args: ['--disable-dev-shm-usage'],
-  };
-  if (executablePath) launchOptions.executablePath = executablePath;
-  else if (channel) launchOptions.channel = channel;
+  const launchOptions = buildLaunchOptions({ headless, executablePath, channel });
 
   let browser;
   let context;
@@ -425,12 +445,7 @@ export async function generateMetaAiVideoViaBrowser({
     : await referenceImageToFile(referenceImage || imageUrl, { fetchImpl });
 
   const pw = playwright || await import('playwright');
-  const launchOptions = {
-    headless: Boolean(headless),
-    args: ['--disable-dev-shm-usage'],
-  };
-  if (executablePath) launchOptions.executablePath = executablePath;
-  else if (channel) launchOptions.channel = channel;
+  const launchOptions = buildLaunchOptions({ headless, executablePath, channel });
 
   let browser;
   let context;
