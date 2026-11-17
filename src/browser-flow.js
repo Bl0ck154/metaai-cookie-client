@@ -148,9 +148,16 @@ async function downloadVideo(videoUrl, { fetchImpl = globalThis.fetch, signal } 
       code: 'META_AI_VIDEO_DOWNLOAD_FAILED',
     });
   }
+  const mimeType = res.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() || '';
+  if (mimeType && !mimeType.startsWith('video/') && mimeType !== 'application/octet-stream') {
+    throw metaAiBrowserError(`Meta AI video URL returned ${mimeType}, not video data`, {
+      status: 502,
+      code: 'META_AI_VIDEO_CONTENT_TYPE_INVALID',
+    });
+  }
   return {
     base64: Buffer.from(await res.arrayBuffer()).toString('base64'),
-    mimeType: res.headers.get('content-type')?.split(';')[0]?.trim() || 'video/mp4',
+    mimeType: mimeType || 'video/mp4',
   };
 }
 
@@ -280,6 +287,8 @@ export async function getMetaAiBrowserStatus({
     return {
       configured: true,
       mode: 'browser',
+      authenticationVerified: false,
+      note: 'Page load is not proof of an authenticated Meta AI session or working video generation.',
       sourceUrl,
       sourceStatus: status,
       title: await page.title().catch(() => ''),
@@ -395,10 +404,15 @@ async function clickSend(page) {
   });
 }
 
+// A media ID or filename is only intermediate metadata, not a downloadable result.
+export function hasUsableVideoUrl(result) {
+  return typeof result?.videoUrl === 'string' && /^https?:\/\//i.test(result.videoUrl);
+}
+
 async function waitForVideoResult(page, observedResults, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const direct = observedResults.find(item => item.videoUrl || item.mediaId || item.filename);
+    const direct = observedResults.find(hasUsableVideoUrl);
     if (direct) return direct;
 
     const scraped = await page.evaluate(() => {
@@ -463,7 +477,10 @@ export async function generateMetaAiVideoViaBrowser({
     await context.addCookies(cookieHeaderToPlaywrightCookies(cookies));
     const page = await context.newPage();
 
+    // Ignore pre-existing home-page media; only count requests after submitting.
+    let observingGeneration = false;
     page.on('response', response => {
+      if (!observingGeneration) return;
       const url = response.url();
       if (/\.mp4(?:\?|$)/i.test(url)) {
         observedResults.push({ found: true, videoUrl: url });
@@ -471,6 +488,7 @@ export async function generateMetaAiVideoViaBrowser({
     });
     page.on('websocket', ws => {
       ws.on('framereceived', data => {
+        if (!observingGeneration) return;
         const parsed = extractMetaAiVideoResultFromText(frameToText(data));
         if (parsed.found) observedResults.push(parsed);
       });
@@ -494,6 +512,7 @@ export async function generateMetaAiVideoViaBrowser({
     }
     try {
       await fillPrompt(page, prompt);
+      observingGeneration = true;
       await clickSend(page);
     } catch (err) {
       throw wrapStageError(err, 'submit_prompt');
